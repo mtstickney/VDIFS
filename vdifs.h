@@ -1,5 +1,7 @@
 #include <linux/types.h>
 
+enum VDI_IMG_TYPE { VDI_DYNAMIC, VDI_FIXED };
+
 struct vdifs_header {
 	/* preheader */
 	char magic_string[64];
@@ -29,11 +31,16 @@ struct vdifs_header {
 struct vdifs_sb_info
 {
 	u_int32_t img_type;
-	u_int32_t *blockmap;
+	int32_t *blockmap;
 	u_int16_t ver_major;
 	u_int16_t ver_minor;
 	u_int32_t img_flags;
 	u_int32_t block_offset;
 	u_int32_t map_offset;
 	u_int32_t disk_blocks;
+	u_int64_t disk_bytes;
+	u_int32_t block_bytes;
+	u_int32_t image_type;
 };
+
+struct vdifs_sb_info *VDIFS_SB(struct super_block*);

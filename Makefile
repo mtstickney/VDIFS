@@ -1,5 +1,5 @@
 # VDIFS module makefile
-obj-m := vdifs.o
+obj-m := vdifs.o inode.o
 module-objs := vdifs.o
 KERNELDIR = /home/mts/dev/linux-2.6.36.2-uml
 

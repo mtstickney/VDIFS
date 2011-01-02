@@ -2,16 +2,23 @@
 #include <linux/init.h>
 #include <linux/module.h>
 #include <linux/fs.h>
+#include <linux/slab.h>
+#include <linux/buffer_head.h>
+#include <linux/blkdev.h>
 #include "vdifs.h"
+
+MODULE_LICENSE("Dual MIT/GPL");
+MODULE_AUTHOR("Matthew Stickney");
 
 #define SB_HEADER_SIZE 512
 #define BLOCK_IMAGE_SIZE 1024
 #define SB_OFFSET 0
 #define BLOCKMAP_ENT_SIZE
 
-#define MAGIC_STRING "<<< Sun xVM VirtualBox Disk Image >>>"
+#define MAGIC_STRING "<<< Oracle xVM VirtualBox Disk Image >>>"
 
-enum VDI_IMG_TYPE { VDI_DYNAMIC, VDI_FIXED };
+static int vdi_get_superblock(struct file_system_type*,
+  int, const char*, void*, struct vfsmount*);
 
 static struct file_system_type vdifs_type = {
 	.name = "vdifs",
@@ -21,94 +28,151 @@ static struct file_system_type vdifs_type = {
 	.next = NULL
 };
 
+inline struct vdifs_sb_info *VDIFS_SB(struct super_block *sb)
+{
+	return sb->s_fs_info; 
+}
+
+static void vdifs_put_super(struct super_block *sb)
+{
+	struct vdifs_sb_info *sbi;
+	
+	sbi = VDIFS_SB(sb);
+	if (sbi && sbi->blockmap)
+		kfree(sbi->blockmap);
+	if (sbi)
+		kfree(sbi);
+}
+
+static struct super_operations vdifs_super_ops = {
+	.statfs = simple_statfs,
+	.put_super = vdifs_put_super,
+};
+
+extern struct dentry *vdifs_create_file(struct super_block*, struct dentry*,
+	const char*);
+extern struct inode *vdifs_make_inode(struct super_block*, int);
 static int vdi_fill_superblock(struct super_block *sb, void *data, int silent)
 {
-	unsigned long offset;
-	int blocksize = SUPERBLOCK_SIZE;
+	int blocksize = SB_HEADER_SIZE;
 	int i;
 	unsigned long logical_sb_block;
 	unsigned long logical_map_block;
-	size_t blockmap_size;
-	struct buffer_head *bh;
+	struct buffer_head *sb_bh, *bmap_bh;
 	struct vdifs_header *vh;
 	struct vdifs_sb_info *sbi;
 	u_int32_t *le_bmap;
-	
+	struct inode *root;
+	struct dentry *root_dentry;
 	
 	sbi = kzalloc(sizeof(struct vdifs_sb_info), GFP_KERNEL);
 	if (!sbi)
 		return -ENOMEM;
-	blocksize = sb_min_blocksize(sb, SUPERBLOCK_SIZE);
+	blocksize = sb_min_blocksize(sb, SB_HEADER_SIZE);
 	if (blocksize <= 0) {
 		printk(KERN_ERR "VDIfs: error: unable to set blocksize");
-		goto failed_blocksize;
+		goto bad_sbi;
 	}
 	
 	logical_sb_block=0;
-	if (!(bh=sb_bread(sb, logical_sb_block))) {
+	if (!(sb_bh=sb_bread(sb, logical_sb_block))) {
 		printk(KERN_ERR "VDIfs: failed to read superblock\n");
-		goto failed_sb_load;
+		goto bad_sbi;
 	}
 	sb->s_fs_info = sbi;
-	vh = (struct vdifs_header *) bh->b_data;
+	vh = (struct vdifs_header *) sb_bh->b_data;
 	/* FIXME: this string could be different (Sun vs Oracle), use magic no. */
-	if (!strcmp(vh->header_string, MAGIC_STRING)) {
+	if (!strcmp(vh->magic_string, MAGIC_STRING)) {
 		printk(KERN_DEBUG "VDIfs: bad magic string, not a VDIFS superblock\n");
-		goto failed_sb_load;
+		goto bad_sb_buf;
 	}
+	sbi->blockmap = NULL;
 	sbi->ver_major = le16_to_cpu(vh->ver_major);
 	sbi->ver_minor = le16_to_cpu(vh->ver_minor);
+	printk(KERN_DEBUG "VDIfs: image has version %u.%u\n", sbi->ver_major, sbi->ver_minor);
 	/* only supporting ver 1.1 right now */
 	if (sbi->ver_major != 1 || sbi->ver_minor != 1) {
 		printk(KERN_ERR "VDIfs: unsupported file version (version ");
-		prinkt(KERN_ERR "%u.%u\n)", sbi->ver_major, sbi->ver_minor);
-		goto failed_sb_load;
+		printk(KERN_ERR "%u.%u\n)", sbi->ver_major, sbi->ver_minor);
+		goto bad_sb_buf;
 	}
-	/* the vdi image block size is huge, so we use something smaller */
-	sb->s_blocksize = PAGE_CACHE_SIZE;
-	sb->s_blocksize_bits = PAGE_CACHE_SHIFT;
+	sb->s_blocksize = le32_to_cpu(vh->block_bytes);
+	printk(KERN_DEBUG "VDIfs: blocksize %lu\n", sb->s_blocksize);
+	sb->s_blocksize_bits = blksize_bits(sb->s_blocksize);
 	sb->s_maxbytes = MAX_LFS_FILESIZE;
 	sbi->img_type = le32_to_cpu(vh->img_type);
+	printk(KERN_DEBUG "VDIfs: image type %u\n", sbi->img_type);
 	sbi->block_offset = le32_to_cpu(vh->block_offset);
+	printk(KERN_DEBUG "VDIfs: data offset %x\n", sbi->block_offset);
 	sbi->map_offset = le32_to_cpu(vh->map_offset);
+	printk(KERN_DEBUG "VDIfs: map_offset %x\n", sbi->map_offset);
 	sbi->disk_blocks = le32_to_cpu(vh->disk_blocks);
-	
+	printk(KERN_DEBUG "VDIfs: %u blocks in image\n", sbi->disk_blocks);
 	/* sanity check */
 	if (sbi->disk_blocks*sbi->block_bytes != sbi->disk_bytes) {
 		printk(KERN_ERR "VDIfs: superblock appears to be corrupt");
-		goto failed_sb_load;
+		goto bad_sb_buf;
 	}
 
-	sbi->blockmap = kzalloc(sbi->disk_blocks);
-	if (!sbi->blockmap) {
-		kfree(sbi);
-		brelse(bh);
-		return -ENOMEM;
-	}
 	if (sbi->image_type == VDI_DYNAMIC) {
-		logical_map_block = sbi->block_offset / sb->s_bdev->bd_block_size;
-		brelse(bh);
-		/* FIXME: magic number 4 (= sizeof(u_int32_t)) */
-		bh = __bread(sb->s_bdev, logical_map_block, sbi->disk_blocks*4);
-		if (!bh) {
-			pintk(KERN_ERR "VDIfs: failed to read block map for dynamic image\n");
-			goto failed_sb_load;
+		sbi->blockmap = kzalloc(sbi->disk_blocks, GFP_KERNEL);
+		if (!sbi->blockmap) {
+			kfree(sbi);
+			brelse(sb_bh);
+			return -ENOMEM;
 		}
-		le_bmap = (u_int32_t*)bh->bdata;
+		logical_map_block = sbi->block_offset / sb->s_bdev->bd_block_size;
+		/* FIXME: magic number 4 (= sizeof(u_int32_t)) */
+		bmap_bh = __bread(sb->s_bdev, logical_map_block, sbi->disk_blocks*4);
+		if (!bmap_bh) {
+			printk(KERN_ERR "VDIfs: failed to read block map for dynamic image\n");
+			goto bad_bmap;
+		}
+		le_bmap = (u_int32_t*)bmap_bh->b_data;
 		for (i=0; i<sbi->disk_blocks; i++) {
 			sbi->blockmap[i] = le32_to_cpu(le_bmap[i]);
 		}
-		brelse(bh);
+		brelse(bmap_bh);
 	}
+	brelse(sb_bh);
+	
+	sb->s_op = &vdifs_super_ops;
+	
+	root = vdifs_make_inode(sb, S_IFDIR | 0555);
+	if (!root)
+		goto bad_bmap;
+	root->i_op = &simple_dir_inode_operations;
+	root->i_fop = &simple_dir_operations;
+	
+	root_dentry = d_alloc_root(root);
+	if (! root_dentry)
+		goto bad_root_inode;
+	if (!vdifs_create_file(sb, root_dentry, "image")) {
+		printk(KERN_ERR "VDIfs: failed to create image file\n");
+		goto bad_root_inode;
+	}
+	return 0;
+
+bad_root_inode:
+	iput(root);
+bad_bmap:
+	if (sbi && sbi->blockmap)
+		kfree(sbi->blockmap);
+bad_sb_buf:
+	brelse(sb_bh);
+bad_sbi:
+	if (sbi)
+		kfree(sbi);
+	return 1;
 }
 
-static struct super_block *vdi_get_superblock(struct file_sytem_type *fst,
+static int vdi_get_superblock(struct file_system_type *fst,
   int flags, const char *devname, void *data, struct vfsmount *vmnt)
 {
 	return get_sb_bdev(fst, flags, devname, data, vdi_fill_superblock, vmnt);
-}
+} 
 
-static int __init vdifs_init()
+static int __init vdifs_init(void)
 {
 	return register_filesystem(&vdifs_type);
 }
