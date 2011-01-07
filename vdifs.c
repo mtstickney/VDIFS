@@ -108,6 +108,8 @@ static int vdi_fill_superblock(struct super_block *sb, void *data, int silent)
 	printk(KERN_DEBUG "VDIfs: map_offset %x\n", sbi->map_offset);
 	sbi->disk_blocks = le32_to_cpu(vh->disk_blocks);
 	printk(KERN_DEBUG "VDIfs: %u blocks in image\n", sbi->disk_blocks);
+	sbi->alloced_blocks = le32_to_cpu(vh->allocated_blocks);
+	printk(KERN_DEBUG "VDIfs: %u allocated blocks in image\n", sbi->alloced_blocks);
 	/* sanity check */
 	if (sbi->disk_blocks*sbi->block_bytes != sbi->disk_bytes) {
 		printk(KERN_ERR "VDIfs: superblock appears to be corrupt");
