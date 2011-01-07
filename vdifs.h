@@ -44,4 +44,10 @@ struct vdifs_sb_info
 	u_int32_t alloced_blocks;
 };
 
-struct vdifs_sb_info *VDIFS_SB(struct super_block*);
+inline struct vdifs_sb_info *VDIFS_SB(struct super_block* sb)
+{
+	return sb->s_fs_info;
+}
+
+extern struct inode *vdifs_make_inode(struct super_block*, int);
+extern struct dentry *vdifs_create_file(struct super_block*, struct dentry*, const char*);
