@@ -1,6 +1,8 @@
 #include <linux/types.h>
 
-enum VDI_IMG_TYPE { VDI_DYNAMIC, VDI_FIXED };
+/* VDI format type codes */
+#define VDI_DYNAMIC 1
+#define VDI_STATIC 2
 
 struct vdifs_header {
 	/* preheader */
