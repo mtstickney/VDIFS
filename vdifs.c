@@ -1,6 +1,7 @@
-#include <linux/kernel.h>
+#define MODULE
 #include <linux/init.h>
 #include <linux/module.h>
+#include <linux/kernel.h>
 #include <linux/fs.h>
 #include <linux/slab.h>
 #include <linux/buffer_head.h>
@@ -28,11 +29,6 @@ static struct file_system_type vdifs_type = {
 	.next = NULL
 };
 
-inline struct vdifs_sb_info *VDIFS_SB(struct super_block *sb)
-{
-	return sb->s_fs_info; 
-}
-
 static void vdifs_put_super(struct super_block *sb)
 {
 	struct vdifs_sb_info *sbi;
@@ -49,9 +45,6 @@ static struct super_operations vdifs_super_ops = {
 	.put_super = vdifs_put_super,
 };
 
-extern struct dentry *vdifs_create_file(struct super_block*, struct dentry*,
-	const char*);
-extern struct inode *vdifs_make_inode(struct super_block*, int);
 static int vdi_fill_superblock(struct super_block *sb, void *data, int silent)
 {
 	int blocksize = SB_HEADER_SIZE;
