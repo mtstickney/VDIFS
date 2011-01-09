@@ -179,4 +179,10 @@ static int __init vdifs_init(void)
 	printk(KERN_DEBUG "VDIFS: register_filesystem returned %d\n", ret);
 	return ret;
 }
+
+static void __exit vdifs_exit(void)
+{
+	unregister_filesystem(&vdifs_type);
+}
 module_init(vdifs_init);
+module_exit(vdifs_exit)
