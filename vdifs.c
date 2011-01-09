@@ -169,6 +169,10 @@ static int vdi_get_superblock(struct file_system_type *fst,
 
 static int __init vdifs_init(void)
 {
-	return register_filesystem(&vdifs_type);
+	int ret;
+	printk(KERN_DEBUG "VDIFS: registering filesystem\n");
+	ret = register_filesystem(&vdifs_type);
+	printk(KERN_DEBUG "VDIFS: register_filesystem returned %d\n", ret);
+	return ret;
 }
 module_init(vdifs_init);
