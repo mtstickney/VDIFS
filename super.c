@@ -1,4 +1,3 @@
-#define MODULE
 #include <linux/init.h>
 #include <linux/module.h>
 #include <linux/kernel.h>
@@ -28,6 +27,11 @@ static struct file_system_type vdifs_type = {
 	.kill_sb = kill_block_super,
 	.next = NULL
 };
+
+inline struct vdifs_sb_info *VDIFS_SB(struct super_block *sb)
+{
+	return sb->s_fs_info;
+}
 
 static void vdifs_put_super(struct super_block *sb)
 {
