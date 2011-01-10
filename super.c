@@ -10,12 +10,12 @@
 MODULE_LICENSE("Dual MIT/GPL");
 MODULE_AUTHOR("Matthew Stickney");
 
-#define SB_HEADER_SIZE 512
+#define SB_HEADER_SIZE sizeof(struct vdifs_header)
 #define BLOCK_IMAGE_SIZE 1024
 #define SB_OFFSET 0
 #define BLOCKMAP_ENT_SIZE
 
-#define MAGIC_STRING "<<< Oracle xVM VirtualBox Disk Image >>>"
+#define MAGIC_STRING "<<< Oracle VM VirtualBox Disk Image >>>"
 
 static int vdi_get_superblock(struct file_system_type*,
   int, const char*, void*, struct vfsmount*);
@@ -37,6 +37,7 @@ static void vdifs_put_super(struct super_block *sb)
 {
 	struct vdifs_sb_info *sbi;
 	
+	printk(KERN_DEBUG "VDIFS: putting superblock\n");
 	sbi = VDIFS_SB(sb);
 	if (sbi && sbi->blockmap)
 		kfree(sbi->blockmap);
@@ -53,7 +54,6 @@ static int vdi_fill_superblock(struct super_block *sb, void *data, int silent)
 {
 	int blocksize = SB_HEADER_SIZE;
 	int i;
-	unsigned long logical_sb_block;
 	unsigned long logical_map_block;
 	struct buffer_head *sb_bh, *bmap_bh;
 	struct vdifs_header *vh;
@@ -62,24 +62,27 @@ static int vdi_fill_superblock(struct super_block *sb, void *data, int silent)
 	struct inode *root;
 	struct dentry *root_dentry;
 	
+	printk(KERN_DEBUG "VDIFS: fill_superblock called\n");
+	
 	sbi = kzalloc(sizeof(struct vdifs_sb_info), GFP_KERNEL);
 	if (!sbi)
 		return -ENOMEM;
-	blocksize = sb_min_blocksize(sb, SB_HEADER_SIZE);
-	if (blocksize <= 0) {
-		printk(KERN_ERR "VDIfs: error: unable to set blocksize");
+	printk(KERN_DEBUG "VDIFS: sbi alloced\n");
+	if (sb_min_blocksize(sb, SB_HEADER_SIZE) < 0) {
+		printk(KERN_ERR "VDIfs: error: unable to set sb blocksize");
 		goto bad_sbi;
 	}
-	
-	logical_sb_block=0;
-	if (!(sb_bh=sb_bread(sb, logical_sb_block))) {
+	printk(KERN_DEBUG "VDIFS: blocksize set (%d)\n", blocksize);
+	if (!(sb_bh=sb_bread(sb, 0))) {
 		printk(KERN_ERR "VDIfs: failed to read superblock\n");
 		goto bad_sbi;
 	}
+	printk(KERN_DEBUG "VDIFS: superblock read completed (size %zu)\n", sb_bh->b_size);
 	sb->s_fs_info = sbi;
 	vh = (struct vdifs_header *) sb_bh->b_data;
+	printk(KERN_DEBUG "VDIFS: magic string \"%s\"\n", vh->magic_string);
 	/* FIXME: this string could be different (Sun vs Oracle), use magic no. */
-	if (!strcmp(vh->magic_string, MAGIC_STRING)) {
+	if (strcmp(vh->magic_string, MAGIC_STRING) != 0) {
 		printk(KERN_DEBUG "VDIfs: bad magic string, not a VDIFS superblock\n");
 		goto bad_sb_buf;
 	}
@@ -105,6 +108,8 @@ static int vdi_fill_superblock(struct super_block *sb, void *data, int silent)
 	printk(KERN_DEBUG "VDIfs: map_offset %x\n", sbi->map_offset);
 	sbi->disk_blocks = le32_to_cpu(vh->disk_blocks);
 	printk(KERN_DEBUG "VDIfs: %u blocks in image\n", sbi->disk_blocks);
+	sbi->disk_bytes = le64_to_cpu(vh->disk_bytes);
+	printk("VDIFS: %llu disk bytes in image\n", sbi->disk_bytes);
 	sbi->alloced_blocks = le32_to_cpu(vh->allocated_blocks);
 	printk(KERN_DEBUG "VDIfs: %u allocated blocks in image\n", sbi->alloced_blocks);
 	/* sanity check */
@@ -112,25 +117,31 @@ static int vdi_fill_superblock(struct super_block *sb, void *data, int silent)
 		printk(KERN_ERR "VDIfs: superblock appears to be corrupt");
 		goto bad_sb_buf;
 	}
+	printk(KERN_DEBUG "VDIFS: sanity check passed\n");
 
 	if (sbi->image_type == VDI_DYNAMIC) {
+		printk(KERN_DEBUG "VDIFS: detected dynamic format\n");
 		sbi->blockmap = kzalloc(sbi->disk_blocks, GFP_KERNEL);
 		if (!sbi->blockmap) {
 			kfree(sbi);
 			brelse(sb_bh);
 			return -ENOMEM;
 		}
+		printk(KERN_DEBUG "VDIFS: blockmap allocated ()");
 		logical_map_block = sbi->block_offset / sb->s_bdev->bd_block_size;
+		printk(KERN_DEBUG "VDIFS: logical map block is %lu\n", logical_map_block);
 		/* FIXME: magic number 4 (= sizeof(u_int32_t)) */
 		bmap_bh = __bread(sb->s_bdev, logical_map_block, sbi->disk_blocks*4);
 		if (!bmap_bh) {
 			printk(KERN_ERR "VDIfs: failed to read block map for dynamic image\n");
 			goto bad_bmap;
 		}
-		le_bmap = (u_int32_t*)bmap_bh->b_data;
+		printk(KERN_DEBUG "VDIFS: block map read (size %zu)\n", bmap_bh->b_size);
+		le_bmap = (int32_t*)bmap_bh->b_data;
 		for (i=0; i<sbi->disk_blocks; i++) {
 			sbi->blockmap[i] = le32_to_cpu(le_bmap[i]);
 		}
+		printk(KERN_DEBUG "VDIFS: blockmap loaded\n");
 		brelse(bmap_bh);
 	}
 	brelse(sb_bh);
@@ -142,14 +153,17 @@ static int vdi_fill_superblock(struct super_block *sb, void *data, int silent)
 		goto bad_bmap;
 	root->i_op = &simple_dir_inode_operations;
 	root->i_fop = &simple_dir_operations;
+	printk(KERN_DEBUG "VDIFS: root inode created\n");
 	
 	root_dentry = d_alloc_root(root);
 	if (! root_dentry)
 		goto bad_root_inode;
+	printk(KERN_DEBUG "VDIFS: root dentry allocated\n");
 	if (!vdifs_create_file(sb, root_dentry, "image")) {
 		printk(KERN_ERR "VDIfs: failed to create image file\n");
 		goto bad_root_inode;
 	}
+	printk(KERN_DEBUG "VDIFS: image file created\n");
 	return 0;
 
 bad_root_inode:

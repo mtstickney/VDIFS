@@ -28,7 +28,8 @@ int vdifs_get_block(struct inode *inode, sector_t iblock,
 	int32_t block_start;
 	sector_t logical_block;
 	struct super_block *sb;
-	
+
+	printk(KERN_DEBUG "VDIFS: vdifs_get_block called\n");	
 	sb = inode->i_sb;
 	if (iblock > VDIFS_SB(inode->i_sb)->disk_blocks)
 		goto out;
@@ -62,11 +63,13 @@ out:
 
 int vdifs_write_page(struct page *page, struct writeback_control *wbc)
 {
+	printk(KERN_DEBUG "VDIFS: vdifs_write_page called\n");
 	return mpage_writepage(page, vdifs_get_block, wbc);
 }
 
 int vdifs_read_page(struct file *file, struct page *page)
 {
+	printk(KERN_DEBUG "VDIFS: vdifs_read_page called\n");
 	return mpage_readpage(page, vdifs_get_block);
 }
 
