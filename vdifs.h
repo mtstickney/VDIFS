@@ -6,9 +6,9 @@
 
 struct vdifs_header {
 	/* preheader */
-	char magic_string[64];
+	__u8 magic_string[64];
 	__le32 img_sig; /* magic number */
-	/* note: version is actually stored as a LE 32bit quantity */
+	/* note: version is technically a LE 32bit quantity */
 	__le16 ver_minor;
 	__le16 ver_major;
 	
@@ -16,7 +16,7 @@ struct vdifs_header {
 	__le32 header_bytes;
 	__le32 img_type;
 	__le32 img_flags;
-	char img_desc[32];
+	__u8 img_desc[32];
 	__le32 map_offset;
 	__le32 block_offset;
 	__le32 cyls, heads, sectors; /* = 0 */
