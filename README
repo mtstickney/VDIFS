@@ -1,0 +1,37 @@
+VDIFS
+
+This is a filesystem module for serving raw-image versions of VirtualBox drive
+files suitable for mounting and manipulating with tools like fdisk and losetup.
+
+Building
+--------
+Edit the Makefile so that the KERNELDIR and ARCH variables are set correctly.
+KERNELDIR should point to the location of the kernel this module is being built
+for, and ARCH should be match the architecture the kernel was built for (for
+example, this would be set to "um" when being built against a User Mode Linux
+kernel). This will produce a file named "vdifs.ko", which can be inserted into
+the kernel it was built against.
+
+Usage
+-----
+Once inserted, this module provides a filesystem called "vdifs". To mount a VDI
+file, the usual mount command should work: "mount -o loop -t vdifs foo.vdi dir/"
+will mount the VDI file foo.vdi on the directory dir/. When the file has been
+mounted, there will be a single file in the mount directory called "image"; this
+is the raw-image version of the VDI disk. It can be manipulated like any other
+drive image.
+
+Caveats
+-------
+At present, only the 1.2 version of the VDI format is supported. Reads and
+writes on dynamic VDI files will also fail due to a limitation of the loopback
+system (this should change soon).
+
+New Versions
+------------
+Newer versions of this module may be available via git at
+http://github.com/mtstickney/VDIFS
+
+Warning: the development branch contains experimental and possibly incomplete
+code. Commits on this branch are not guaranteed to build, run, or run correctly.
+Stable code can be found on the master branch.
