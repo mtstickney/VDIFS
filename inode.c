@@ -76,15 +76,16 @@ int vdifs_read_page(struct file *file, struct page *page)
 struct inode *vdifs_make_inode(struct super_block *sb, int mode)
 {
 	struct inode *inode;
+	struct vdifs_sb_info *sbi;
 	
+	sbi = VDIFS_SB(sb);
 	inode = new_inode(sb);
 	if (!inode)
 		return NULL;
 	inode->i_mode = mode;
 	inode->i_uid = inode->i_gid = 0;
-	/* looks like this is set with inode_init_always() */
-	/* inode->i_blkbits = sb->s_blocksize_bits; */
-	inode->i_blocks = VDIFS_SB(sb)->disk_blocks;
+	inode->i_size = sbi->disk_bytes;
+	inode->i_blocks = sbi->disk_bytes / sb->s_blocksize;
 	inode->i_mtime = inode->i_ctime = inode->i_atime = CURRENT_TIME;
 	inode->i_mapping->a_ops = &vdifs_aops;
 	return inode; 

@@ -52,9 +52,9 @@ static struct super_operations vdifs_super_ops = {
 
 static int vdi_fill_superblock(struct super_block *sb, void *data, int silent)
 {
-	int blocksize = SB_HEADER_SIZE;
 	int i;
 	unsigned long logical_map_block;
+	u_int64_t disk_bytes;
 	struct buffer_head *sb_bh, *bmap_bh;
 	struct vdifs_header *vh;
 	struct vdifs_sb_info *sbi;
@@ -72,7 +72,7 @@ static int vdi_fill_superblock(struct super_block *sb, void *data, int silent)
 		printk(KERN_ERR "VDIfs: error: unable to set sb blocksize");
 		goto bad_sbi;
 	}
-	printk(KERN_DEBUG "VDIFS: blocksize set (%d)\n", blocksize);
+	printk(KERN_DEBUG "VDIFS: blocksize set (%lu)\n", sb->s_blocksize);
 	if (!(sb_bh=sb_bread(sb, 0))) {
 		printk(KERN_ERR "VDIfs: failed to read superblock\n");
 		goto bad_sbi;
@@ -96,9 +96,10 @@ static int vdi_fill_superblock(struct super_block *sb, void *data, int silent)
 		printk(KERN_ERR "%u.%u\n)", sbi->ver_major, sbi->ver_minor);
 		goto bad_sb_buf;
 	}
-	sb->s_blocksize = le32_to_cpu(vh->block_bytes);
+	/* sb->s_blocksize = le32_to_cpu(vh->block_bytes); */
+	sb->s_blocksize = PAGE_SIZE;
 	printk(KERN_DEBUG "VDIfs: blocksize %lu\n", sb->s_blocksize);
-	sb->s_blocksize_bits = blksize_bits(sb->s_blocksize);
+	sb->s_blocksize_bits = PAGE_SHIFT;
 	sb->s_maxbytes = MAX_LFS_FILESIZE;
 	sbi->img_type = le32_to_cpu(vh->img_type);
 	printk(KERN_DEBUG "VDIfs: image type %u\n", sbi->img_type);
