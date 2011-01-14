@@ -16,7 +16,7 @@ struct vdifs_header {
 	__le32 header_bytes;
 	__le32 img_type;
 	__le32 img_flags;
-	__u8 img_desc[32];
+	__u8 img_desc[256];
 	__le32 map_offset;
 	__le32 block_offset;
 	__le32 cyls, heads, sectors; /* = 0 */
