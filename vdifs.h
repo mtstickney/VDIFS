@@ -42,7 +42,6 @@ struct vdifs_sb_info
 	u_int32_t disk_blocks;
 	u_int64_t disk_bytes;
 	u_int32_t block_bytes;
-	u_int32_t image_type;
 	u_int32_t alloced_blocks;
 };
 

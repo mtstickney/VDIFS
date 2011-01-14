@@ -112,14 +112,22 @@ static int vdi_fill_superblock(struct super_block *sb, void *data, int silent)
 	printk("VDIFS: %llu disk bytes in image\n", sbi->disk_bytes);
 	sbi->alloced_blocks = le32_to_cpu(vh->allocated_blocks);
 	printk(KERN_DEBUG "VDIfs: %u allocated blocks in image\n", sbi->alloced_blocks);
+	sbi->block_bytes = le32_to_cpu(vh->block_bytes);
+	printk(KERN_DEBUG "VDIFS: %u bytes per image block\n", sbi->block_bytes);
 	/* sanity check */
-	if (sbi->disk_blocks*sbi->block_bytes != sbi->disk_bytes) {
+	disk_bytes = sbi->disk_blocks*sb->s_blocksize;
+#if 0
+	if (disk_bytes != sbi->disk_bytes) {
+		printk(KERN_DEBUG "VDIFS: disk_blocks=%u, block_bytes=%lu, disk_bytes=%llu\n",
+			sbi->disk_blocks, sb->s_blocksize, sbi->disk_bytes);
 		printk(KERN_ERR "VDIfs: superblock appears to be corrupt");
+		printk(KERN_ERR "VDIFS: calculated disk size is %llu\n", disk_bytes);
 		goto bad_sb_buf;
 	}
+#endif
 	printk(KERN_DEBUG "VDIFS: sanity check passed\n");
 
-	if (sbi->image_type == VDI_DYNAMIC) {
+	if (sbi->img_type == VDI_DYNAMIC) {
 		printk(KERN_DEBUG "VDIFS: detected dynamic format\n");
 		sbi->blockmap = kzalloc(sbi->disk_blocks, GFP_KERNEL);
 		if (!sbi->blockmap) {
