@@ -10,12 +10,12 @@
 MODULE_LICENSE("Dual MIT/GPL");
 MODULE_AUTHOR("Matthew Stickney");
 
-#define SB_HEADER_SIZE sizeof(struct vdifs_header)
+#define SB_HEADER_SIZE 512
 #define BLOCK_IMAGE_SIZE 1024
 #define SB_OFFSET 0
 #define BLOCKMAP_ENT_SIZE
 
-#define MAGIC_STRING "<<< Oracle VM VirtualBox Disk Image >>>"
+#define MAGIC_STRING "<<< Oracle VM VirtualBox Disk Image >>>\n"
 
 static int vdi_get_superblock(struct file_system_type*,
   int, const char*, void*, struct vfsmount*);
