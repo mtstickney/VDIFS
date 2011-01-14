@@ -11,7 +11,8 @@ static struct file_operations vdifs_file_ops = {
 	.write = do_sync_write,
 	.aio_read = generic_file_aio_read,
 	.aio_write = generic_file_aio_write,
-	.mmap = generic_file_mmap
+	.mmap = generic_file_mmap,
+	.llseek = generic_file_llseek,
 };
 
 int vdifs_write_page(struct page*, struct writeback_control*);
