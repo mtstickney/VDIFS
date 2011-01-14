@@ -172,6 +172,8 @@ static int vdi_fill_superblock(struct super_block *sb, void *data, int silent)
 		goto bad_root_inode;
 	}
 	printk(KERN_DEBUG "VDIFS: image file created\n");
+	printk(KERN_DEBUG "VDIFS: block device has size %llu\n", sb->s_bdev->bd_inode->i_size);
+	sb->s_root = root_dentry;
 	return 0;
 
 bad_root_inode:
