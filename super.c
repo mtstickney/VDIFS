@@ -104,7 +104,7 @@ static int vdifs_fill_superblock(struct super_block *sb, void *data, int silent)
 	if (!sbi)
 		return -ENOMEM;
 	printk(KERN_DEBUG "VDIFS: sbi alloced\n");
-	if (sb_min_blocksize(sb, SB_HEADER_SIZE) < 0) {
+	if (sb_min_blocksize(sb, VDIFS_BLOCK_SIZE) < 0) {
 		printk(KERN_ERR "VDIfs: error: unable to set sb blocksize");
 		goto bad_sbi;
 	}
@@ -133,10 +133,9 @@ static int vdifs_fill_superblock(struct super_block *sb, void *data, int silent)
 		printk(KERN_ERR "%u.%u\n)", sbi->ver_major, sbi->ver_minor);
 		goto bad_sb_buf;
 	}
-	/* sb->s_blocksize = le32_to_cpu(vh->block_bytes); */
-	sb->s_blocksize = PAGE_SIZE;
+	sb->s_blocksize = VDIFS_BLOCK_SIZE;
 	printk(KERN_DEBUG "VDIfs: blocksize %lu\n", sb->s_blocksize);
-	sb->s_blocksize_bits = PAGE_SHIFT;
+	sb->s_blocksize_bits = blksize_bits(VDIFS_BLOCK_SIZE);
 	sb->s_maxbytes = MAX_LFS_FILESIZE;
 	sbi->img_type = le32_to_cpu(vh->img_type);
 	printk(KERN_DEBUG "VDIfs: image type %u\n", sbi->img_type);
