@@ -16,14 +16,18 @@ MODULE_AUTHOR("Matthew Stickney");
 #define BLOCKMAP_ENT_SIZE
 
 #define MAGIC_STRING "<<< Oracle VM VirtualBox Disk Image >>>\n"
+#define MAGIC_NO 0x7f10dabe
 
-static int vdi_get_superblock(struct file_system_type*,
+#define VDIFS_BLOCK_SIZE 512
+
+static int vdifs_get_superblock(struct file_system_type*,
   int, const char*, void*, struct vfsmount*);
+static void vdifs_write_super(struct super_block*);
 
 static struct file_system_type vdifs_type = {
 	.name = "vdifs",
 	.owner = THIS_MODULE,
-	.get_sb = vdi_get_superblock,
+	.get_sb = vdifs_get_superblock,
 	.kill_sb = kill_block_super,
 	.next = NULL
 };
@@ -48,9 +52,10 @@ static void vdifs_put_super(struct super_block *sb)
 static struct super_operations vdifs_super_ops = {
 	.statfs = simple_statfs,
 	.put_super = vdifs_put_super,
+	.write_super = vdifs_write_super
 };
 
-static int vdi_fill_superblock(struct super_block *sb, void *data, int silent)
+static int vdifs_fill_superblock(struct super_block *sb, void *data, int silent)
 {
 	int i;
 	unsigned long logical_map_block;
@@ -190,10 +195,10 @@ bad_sbi:
 	return 1;
 }
 
-static int vdi_get_superblock(struct file_system_type *fst,
+static int vdifs_get_superblock(struct file_system_type *fst,
   int flags, const char *devname, void *data, struct vfsmount *vmnt)
 {
-	return get_sb_bdev(fst, flags, devname, data, vdi_fill_superblock, vmnt);
+	return get_sb_bdev(fst, flags, devname, data, vdifs_fill_superblock, vmnt);
 } 
 
 static int __init vdifs_init(void)
