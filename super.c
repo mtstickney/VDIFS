@@ -43,6 +43,8 @@ static void vdifs_put_super(struct super_block *sb)
 	
 	printk(KERN_DEBUG "VDIFS: putting superblock\n");
 	sbi = VDIFS_SB(sb);
+	brelse(sbi->super_bh);
+	brelse(sbi->bmap_bh);
 	if (sbi && sbi->blockmap)
 		kfree(sbi->blockmap);
 	if (sbi)
@@ -54,6 +56,35 @@ static struct super_operations vdifs_super_ops = {
 	.put_super = vdifs_put_super,
 	.write_super = vdifs_write_super
 };
+
+static void vdifs_write_super(struct super_block *sb)
+{
+	struct vdifs_sb_info *sbi;
+	struct vdifs_header *sb_header;
+	struct buffer_head *super_bh, *bmap_bh;
+	int32_t *bmap;
+	u_int32_t i;
+
+	sbi = VDIFS_SB(sb);
+	super_bh = sbi->super_bh;
+	bmap_bh = sbi->bmap_bh;
+	sb_header = (struct vdifs_header*)super_bh->b_data;
+	bmap = (int32_t*)bmap_bh->b_data;
+
+	if (sbi->img_type == VDI_STATIC || !sb->s_dirt)
+		return;
+
+	/* Note: allocated blocks should be the only changed fields */
+	sb_header->allocated_blocks = cpu_to_le32(sbi->alloced_blocks);
+	for (i=0; i<sbi->disk_blocks; i++) {
+		
+		bmap[i] = cpu_to_le32(sbi->blockmap[i]);
+	}
+	mark_buffer_dirty(super_bh);
+	mark_buffer_dirty(bmap_bh);
+	sync_dirty_buffer(super_bh);
+	sync_dirty_buffer(bmap_bh);
+}
 
 static int vdifs_fill_superblock(struct super_block *sb, void *data, int silent)
 {
@@ -82,6 +113,7 @@ static int vdifs_fill_superblock(struct super_block *sb, void *data, int silent)
 		printk(KERN_ERR "VDIfs: failed to read superblock\n");
 		goto bad_sbi;
 	}
+	sbi->super_bh = sb_bh;
 	printk(KERN_DEBUG "VDIFS: superblock read completed (size %zu)\n", sb_bh->b_size);
 	sb->s_fs_info = sbi;
 	vh = (struct vdifs_header *) sb_bh->b_data;
@@ -150,15 +182,14 @@ static int vdifs_fill_superblock(struct super_block *sb, void *data, int silent)
 			printk(KERN_ERR "VDIfs: failed to read block map for dynamic image\n");
 			goto bad_bmap;
 		}
+		sbi->bmap_bh = bmap_bh;
 		printk(KERN_DEBUG "VDIFS: block map read (size %zu)\n", bmap_bh->b_size);
 		le_bmap = (int32_t*)bmap_bh->b_data;
 		for (i=0; i<sbi->disk_blocks; i++) {
 			sbi->blockmap[i] = le32_to_cpu(le_bmap[i]);
 		}
 		printk(KERN_DEBUG "VDIFS: blockmap loaded\n");
-		brelse(bmap_bh);
 	}
-	brelse(sb_bh);
 	
 	sb->s_op = &vdifs_super_ops;
 	

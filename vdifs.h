@@ -43,6 +43,8 @@ struct vdifs_sb_info
 	u_int64_t disk_bytes;
 	u_int32_t block_bytes;
 	u_int32_t alloced_blocks;
+	struct buffer_head *super_bh;
+	struct buffer_head *bmap_bh;
 };
 
 extern inline struct vdifs_sb_info *VDIFS_SB(struct super_block*);
