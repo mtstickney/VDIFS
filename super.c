@@ -152,8 +152,7 @@ static int vdifs_fill_superblock(struct super_block *sb, void *data, int silent)
 	sbi->block_bytes = le32_to_cpu(vh->block_bytes);
 	printk(KERN_DEBUG "VDIFS: %u bytes per image block\n", sbi->block_bytes);
 	/* sanity check */
-	disk_bytes = sbi->disk_blocks*sb->s_blocksize;
-#if 0
+	disk_bytes = sbi->disk_blocks*sbi->block_bytes;
 	if (disk_bytes != sbi->disk_bytes) {
 		printk(KERN_DEBUG "VDIFS: disk_blocks=%u, block_bytes=%lu, disk_bytes=%llu\n",
 			sbi->disk_blocks, sb->s_blocksize, sbi->disk_bytes);
@@ -161,7 +160,6 @@ static int vdifs_fill_superblock(struct super_block *sb, void *data, int silent)
 		printk(KERN_ERR "VDIFS: calculated disk size is %llu\n", disk_bytes);
 		goto bad_sb_buf;
 	}
-#endif
 	printk(KERN_DEBUG "VDIFS: sanity check passed\n");
 
 	if (sbi->img_type == VDI_DYNAMIC) {
