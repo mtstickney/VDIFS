@@ -131,12 +131,14 @@ static int vdifs_get_block(struct inode *inode, sector_t iblock,
 		printk(KERN_DEBUG "VDIFS: request size is %zu\n", bh_result->b_size);
 		map_bh(bh_result, sb, logical_block);
 		return 0;
-	} else {
+	} else { /* Dynamic format */
+		struct vdifs_sb_info *sbi;
+
+		sbi = VDIFS_SB(sb);
 		printk(KERN_DEBUG "VDIFS: getting dynamic block\n");
-		/* assuming sparse vdi format */
 		block_start = iblock * sb->s_blocksize + VDIFS_SB(sb)->block_offset;
 		img_block = block_start / VDIFS_SB(sb)->block_bytes;
-		img_block_start = VDIFS_SB(sb)->blockmap[img_block];
+		img_block_start = sbi->blockmap[img_block]*sbi->block_bytes+sbi->block_offset;
 		if (img_block_start < 0) {
 			if (!create) {
 				printk(KERN_DEBUG "VDIFS: not allocating block\n");
