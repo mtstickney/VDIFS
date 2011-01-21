@@ -28,7 +28,7 @@ static struct file_system_type vdifs_type = {
 	.name = "vdifs",
 	.owner = THIS_MODULE,
 	.get_sb = vdifs_get_superblock,
-	.kill_sb = kill_block_super,
+	.kill_sb = kill_litter_super,
 	.next = NULL
 };
 
@@ -118,11 +118,12 @@ static int vdifs_fill_superblock(struct super_block *sb, void *data, int silent)
 	sb->s_fs_info = sbi;
 	vh = (struct vdifs_header *) sb_bh->b_data;
 	printk(KERN_DEBUG "VDIFS: magic string \"%s\"\n", vh->magic_string);
-	/* FIXME: this string could be different (Sun vs Oracle), use magic no. */
-	if (strcmp(vh->magic_string, MAGIC_STRING) != 0) {
-		printk(KERN_DEBUG "VDIfs: bad magic string, not a VDIFS superblock\n");
+#if 0
+	if (vh->img_sig != MAGIC_NO) {
+		printk(KERN_DEBUG "VDIfs: Bad magic number %x, not a VDIFS superblock\n", vh->img_sig);
 		goto bad_sb_buf;
 	}
+#endif
 	sbi->blockmap = NULL;
 	sbi->ver_major = le16_to_cpu(vh->ver_major);
 	sbi->ver_minor = le16_to_cpu(vh->ver_minor);
